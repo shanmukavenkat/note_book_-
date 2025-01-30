@@ -158,6 +158,9 @@ function App() {
             <p className="text-base font-medium text-blue-500">
               Sign up ayi, Sign in avu
             </p>
+            <p className="text-base font-medium text-teal-500">
+            It Works try it
+          </p>
           </div>
         </div>
       );
@@ -176,6 +179,7 @@ function App() {
           <p className="text-base font-medium text-blue-500">
             Sign up ayi, Sign in avu
           </p>
+          
         </div>
       );
     }
