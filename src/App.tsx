@@ -238,7 +238,7 @@ function App() {
               onClick={() => setIsAuthModalOpen(true)}
               className="flex items-center gap-2 px-6 py-3 newspaper-border bg-white hover:bg-gray-50 transition-colors"
             >
-              <LogIn size={16} /> Sign In
+              <LogIn size={16} /> Sign In /Sign Up
             </button>
           )}
         </div>
