@@ -109,15 +109,21 @@ function App() {
       toast.error(error.message);
     }
   };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    setSession(null); // Ensure session is reset
     setLinks([]);
     setFavorites([]);
-    setShowDelayedContent(true);
+    setLoading(true); // Trigger loading state again
+    setShowDelayedContent(false); // Ensure delayed content gets triggered again
+  
+    // Restart the delayed content timer
+    setTimeout(() => {
+      setShowDelayedContent(true);
+    }, 3000);
+  
     toast.success('Signed out successfully');
   };
-
   const addLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) {
@@ -276,10 +282,10 @@ function App() {
       return (
         <div
           key={link.id}
-          className="p-6 newspaper-border bg-white"
+          className="p-2 newspaper-border bg-white"
         >
           <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-4">
+            <div className="flex justify-between items-center ">
               <Link2 className="text-gray-800" size={20} />
               <div>
                 <a
@@ -295,7 +301,7 @@ function App() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => toggleFavorite(link.id)}
                 className="text-gray-800 hover:text-black transition-colors"
@@ -355,9 +361,9 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto">
+      <main className="max-w-4xl mx-full mx-auto">
         {session && (
-          <form onSubmit={addLink} className="mb-12 p-8 newspaper-border bg-white">
+          <form onSubmit={addLink} className="mb-12 p-12   newspaper-border bg-white">
             <h2 className="text-2xl font-bold mb-6 font-playfair">Add New Entry 📝</h2>
             <div className="flex flex-col md:flex-row gap-4">
               <input
