@@ -1,13 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { toast, Toaster } from 'react-hot-toast';
-import { Link2, Trash2, LogIn, LogOut, Share2 } from 'lucide-react';
+import { Link2, Trash2, LogIn, LogOut, Share2, Star, StarOff } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 type Link = {
   id: string;
   name: string;
   url: string;
+  creator_email: string;
   created_at: string;
+  is_favorited?: boolean;
+};
+
+type Favorite = {
+  id: string;
+  link_id: string;
+  user_id: string;
 };
 
 function App() {
@@ -19,24 +27,30 @@ function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authData, setAuthData] = useState({ email: '', password: '' });
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchLinks();
+      if (session) {
+        fetchLinks();
+        fetchFavorites();
+      }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchLinks();
+      if (session) {
+        fetchLinks();
+        fetchFavorites();
+      }
     });
 
-    // Set timer for delayed content
     const timer = setTimeout(() => {
       setShowDelayedContent(true);
-    }, 3000); // 3 seconds delay
+    }, 3000);
 
     return () => {
       subscription.unsubscribe();
@@ -57,6 +71,22 @@ function App() {
       toast.error('Error fetching links');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFavorites = async () => {
+    if (!session) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('*')
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      setFavorites(data || []);
+    } catch (error) {
+      toast.error('Error fetching favorites');
     }
   };
 
@@ -83,6 +113,7 @@ function App() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setLinks([]);
+    setFavorites([]);
     setShowDelayedContent(true);
     toast.success('Signed out successfully');
   };
@@ -100,6 +131,7 @@ function App() {
           name: newLink.name,
           url: newLink.url,
           user_id: session.user.id,
+          creator_email: session.user.email,
         },
       ]);
 
@@ -112,7 +144,12 @@ function App() {
     }
   };
 
-  const deleteLink = async (id: string) => {
+  const deleteLink = async (id: string, creatorEmail: string) => {
+    if (session?.user?.email !== creatorEmail) {
+      toast.error('You can only delete your own links');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('links').delete().eq('id', id);
       if (error) throw error;
@@ -120,6 +157,58 @@ function App() {
       toast.success('Link deleted successfully!');
     } catch (error) {
       toast.error('Error deleting link');
+    }
+  };
+
+  const toggleFavorite = async (linkId: string) => {
+    if (!session) {
+      toast.error('Please sign in first');
+      return;
+    }
+
+    const isFavorited = favorites.some(fav => fav.link_id === linkId);
+
+    try {
+      if (isFavorited) {
+        // Delete favorite
+        const { error } = await supabase
+          .from('favorites')
+          .delete()
+          .match({ link_id: linkId, user_id: session.user.id });
+
+        if (error) throw error;
+        setFavorites(favorites.filter(fav => fav.link_id !== linkId));
+        toast.success('Removed from favorites');
+      } else {
+        // Check if favorite already exists
+        const { data: existingFavorite } = await supabase
+          .from('favorites')
+          .select('*')
+          .match({ link_id: linkId, user_id: session.user.id })
+          .single();
+
+        if (!existingFavorite) {
+          // Create new favorite
+          const { data, error } = await supabase
+            .from('favorites')
+            .insert([{ link_id: linkId, user_id: session.user.id }])
+            .select()
+            .single();
+
+          if (error) throw error;
+          if (data) {
+            setFavorites([...favorites, data]);
+            toast.success('Added to favorites');
+          }
+        }
+      }
+    } catch (error: any) {
+      // Handle specific error cases
+      if (error.code === '23505') { // Unique constraint violation
+        toast.error('Already in favorites');
+      } else {
+        toast.error('Error updating favorites');
+      }
     }
   };
 
@@ -159,17 +248,15 @@ function App() {
               Sign up ayi, Sign in avu
             </p>
             <p className="text-base font-medium text-teal-500">
-            It Works try it
-          </p>
+            Discover something new and exciting here! 🤩🚀 What could it be? Let’s find out together! 🤔✨            </p>
           </div>
         </div>
       );
     }
 
-    if (!session || links.length === 0) {
+    if (!session) {
       return (
         <div className="text-center">
-        <p className="text-xl font-semibold text-gray-800">Loading entries...</p>
           <img
             src="https://res.cloudinary.com/dg3jizjwv/image/upload/v1738217167/GOwyySDaMAIeHZZ_wtcwca.jpg"
             alt="Loading"
@@ -179,45 +266,64 @@ function App() {
           <p className="text-base font-medium text-blue-500">
             Sign up ayi, Sign in avu
           </p>
-          
         </div>
       );
     }
 
-    return links.map((link) => (
-      <div
-        key={link.id}
-        className="p-6 newspaper-border bg-white flex justify-between items-center"
-      >
-        <div className="flex items-center gap-4">
-          <Link2 className="text-gray-800" size={20} />
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="newspaper-link text-lg"
-          >
-            {link.name}
-          </a>
+    return links.map((link) => {
+      const isFavorited = favorites.some(fav => fav.link_id === link.id);
+      
+      return (
+        <div
+          key={link.id}
+          className="p-6 newspaper-border bg-white"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-4">
+              <Link2 className="text-gray-800" size={20} />
+              <div>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="newspaper-link text-lg block"
+                >
+                  {link.name}
+                </a>
+                <span className="text-sm text-gray-600">
+                  Added by: {link.creator_email}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => toggleFavorite(link.id)}
+                className="text-gray-800 hover:text-black transition-colors"
+                aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+              >
+                {isFavorited ? <Star size={20} fill="currentColor" /> : <StarOff size={20} />}
+              </button>
+              <button
+                onClick={() => shareLink(link)}
+                className="text-gray-800 hover:text-black transition-colors"
+                aria-label="Share link"
+              >
+                <Share2 size={20} />
+              </button>
+              {session?.user?.email === link.creator_email && (
+                <button
+                  onClick={() => deleteLink(link.id, link.creator_email)}
+                  className="text-gray-800 hover:text-black transition-colors"
+                  aria-label="Delete link"
+                >
+                  <Trash2 size={20} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => shareLink(link)}
-            className="text-gray-800 hover:text-black transition-colors"
-            aria-label="Share link"
-          >
-            <Share2 size={20} />
-          </button>
-          <button
-            onClick={() => deleteLink(link.id)}
-            className="text-gray-800 hover:text-black transition-colors"
-            aria-label="Delete link"
-          >
-            <Trash2 size={20} />
-          </button>
-        </div>
-      </div>
-    ));
+      );
+    });
   };
 
   return (
@@ -242,7 +348,7 @@ function App() {
               onClick={() => setIsAuthModalOpen(true)}
               className="flex items-center gap-2 px-6 py-3 newspaper-border bg-white hover:bg-gray-50 transition-colors"
             >
-              <LogIn size={16} /> Sign In /Sign Up
+              <LogIn size={16} /> Sign In / Sign Up
             </button>
           )}
         </div>
