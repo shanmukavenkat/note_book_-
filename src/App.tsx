@@ -14,6 +14,7 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDelayedContent, setShowDelayedContent] = useState(false);
   const [newLink, setNewLink] = useState({ name: '', url: '' });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -32,7 +33,15 @@ function App() {
       if (session) fetchLinks();
     });
 
-    return () => subscription.unsubscribe();
+    // Set timer for delayed content
+    const timer = setTimeout(() => {
+      setShowDelayedContent(true);
+    }, 3000); // 3 seconds delay
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   const fetchLinks = async () => {
@@ -74,6 +83,7 @@ function App() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setLinks([]);
+    setShowDelayedContent(true);
     toast.success('Signed out successfully');
   };
 
@@ -131,6 +141,79 @@ function App() {
     } catch (error) {
       toast.error('Error sharing link');
     }
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="text-center">
+          <p className="text-xl font-semibold text-gray-800">Loading entries...</p>
+          <div className={`transition-opacity duration-500 ${showDelayedContent ? 'opacity-100' : 'opacity-0'}`}>
+            <img
+              src="https://res.cloudinary.com/dg3jizjwv/image/upload/v1738217167/GOwyySDaMAIeHZZ_wtcwca.jpg"
+              alt="Loading"
+              className="mx-auto my-4 rounded-lg shadow-lg"
+            />
+            <p className="text-lg font-medium text-red-600">Rataleda🤣🤣🤣......</p>
+            <p className="text-base font-medium text-blue-500">
+              Sign up ayi, Sign in avu
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!session || links.length === 0) {
+      return (
+        <div className="text-center">
+        <p className="text-xl font-semibold text-gray-800">Loading entries...</p>
+          <img
+            src="https://res.cloudinary.com/dg3jizjwv/image/upload/v1738217167/GOwyySDaMAIeHZZ_wtcwca.jpg"
+            alt="Loading"
+            className="mx-auto my-4 rounded-lg shadow-lg"
+          />
+          <p className="text-lg font-medium text-red-600">Rataleda🤣🤣🤣......</p>
+          <p className="text-base font-medium text-blue-500">
+            Sign up ayi, Sign in avu
+          </p>
+        </div>
+      );
+    }
+
+    return links.map((link) => (
+      <div
+        key={link.id}
+        className="p-6 newspaper-border bg-white flex justify-between items-center"
+      >
+        <div className="flex items-center gap-4">
+          <Link2 className="text-gray-800" size={20} />
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="newspaper-link text-lg"
+          >
+            {link.name}
+          </a>
+        </div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => shareLink(link)}
+            className="text-gray-800 hover:text-black transition-colors"
+            aria-label="Share link"
+          >
+            <Share2 size={20} />
+          </button>
+          <button
+            onClick={() => deleteLink(link.id)}
+            className="text-gray-800 hover:text-black transition-colors"
+            aria-label="Delete link"
+          >
+            <Trash2 size={20} />
+          </button>
+        </div>
+      </div>
+    ));
   };
 
   return (
@@ -194,46 +277,7 @@ function App() {
         )}
 
         <div className="grid gap-6">
-          {loading ? (
-            <p className="text-center text-xl">Loading entries...</p>
-          ) : links.length > 0 ? (
-            links.map((link) => (
-              <div
-                key={link.id}
-                className="p-6 newspaper-border bg-white flex justify-between items-center"
-              >
-                <div className="flex items-center gap-4">
-                  <Link2 className="text-gray-800" size={20} />
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="newspaper-link text-lg"
-                  >
-                    {link.name}
-                  </a>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => shareLink(link)}
-                    className="text-gray-800 hover:text-black transition-colors"
-                    aria-label="Share link"
-                  >
-                    <Share2 size={20} />
-                  </button>
-                  <button
-                    onClick={() => deleteLink(link.id)}
-                    className="text-gray-800 hover:text-black transition-colors"
-                    aria-label="Delete link"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-center text-xl text-gray-600">No entries found</p>
-          )}
+          {renderContent()}
         </div>
       </main>
 
